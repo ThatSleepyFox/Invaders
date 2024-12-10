@@ -4,8 +4,6 @@
 
     TODO:
     -Több elleséges sprite készítése
-    -Ellenség mozgatása
-    -Ellenség tüzelése
     -Hitboxok kezelése
     -HP kezelése
     -HP sprite létrehozása
@@ -53,8 +51,7 @@ class MenuScene extends Phaser.Scene{
             angle: { from: -15, to: 15 }, 
             duration: 2000,
             yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
+            repeat: -1
         });
 
     }
@@ -77,15 +74,16 @@ class GameScene extends Phaser.Scene{
         this.playerBulletSpeed = 300;
         this.reloadTimer = 3000;
 
-        this.enemySpeed = 150;
+        this.enemySpeed = 100;
         this.enemyBulletSpeed = 300; 
     }
     preload(){
         this.load.image('background', 'assets/background.png');
         this.load.image('ship', 'assets/enemy01.png');
         this.load.image('enemy', 'assets/enemy02.png');
+        this.load.image('enemy2', 'assets/enemy03.png');
         this.load.spritesheet('shield', 'assets/shiled.png', {
-            frameWidth:96,
+            frameWidth:32,
             frameHeight: 32,
             margin: 0,
             spacing: 0
@@ -106,18 +104,28 @@ class GameScene extends Phaser.Scene{
         this.background.setOrigin(0,0);
 
         //Játékos
-        this.player = this.add.sprite(180, 580, 'ship');
-        this.physics.add.existing(this.player);
-        this.player.body.setCollideWorldBounds(true);
+        this.onCreatePlayer();
+
+        //Pajzs
+        this.anims.create({
+            key: 'shield',
+            frames: this.anims.generateFrameNumbers('shield', {start: 0, end: 2}),
+            frameRate: 8,
+            repeat: 0
+        });
         
         //Ellenség
-        this.enemy = this.add.sprite(180, 50, 'enemy');
-        this.enemy.setFlip(0, 1);
+        this.onCreateEnemy();
+
+        //Ellenség lövedék
+        this.enemyBullets = this.physics.add.group({
+            defaultKey: 'enemybullet',
+        });
 
         //Játékos lövedék
         this.bullets = this.physics.add.group({
             defaultKey: 'bullet',
-            maxSize: 15,
+            maxSize: 15
         });
 
         this.ammoText = this.add.text(this.player.x-16, this.player.y, '', {
@@ -127,6 +135,8 @@ class GameScene extends Phaser.Scene{
 
         this.spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.cursor = this.input.keyboard.createCursorKeys();
+
+
     }
     update(){
         const ammoCounter = this.bullets.getTotalFree();
@@ -134,7 +144,7 @@ class GameScene extends Phaser.Scene{
             this.ammoText.setText("Reloading");
         }
 
-        this.ammoText.setPosition(this.player.x+16, this.player.y-5);
+        this.ammoText.setPosition(this.player.x+16, this.player.y-5); 
         if(Phaser.Input.Keyboard.JustDown(this.spacebar)){
 
             this.onShooting();
@@ -149,6 +159,71 @@ class GameScene extends Phaser.Scene{
         }
         else {
             this.player.body.setVelocityX(0);
+        }
+
+        const enemyBulletEntity = this.enemyBullets.getChildren();
+        for(let i = 0; i < this.bullets.length; i++){
+            const eBullet = enemyBulletEntity[i];
+            if(eBullet.active && this.bullets.y > 360){
+                this.enemyBullets.killAndHide(eBullet);
+            }
+        }
+
+        
+
+    }
+
+    onCreatePlayer(){
+        this.player = this.add.sprite(180, 580, 'ship');
+        this.physics.add.existing(this.player);
+        this.player.body.setCollideWorldBounds(true);
+    }
+
+    onCreateEnemy(){
+        this.enemies = this.physics.add.group({
+            collideWorldBounds: true,
+            bounceX: 1
+        });
+        for(let i = 0; i < 5; i++){
+            const x = Phaser.Math.Between(50, 600);
+            const y = Phaser.Math.Between(50, 300);
+
+            const random = Phaser.Math.Between(0,1);
+            switch(random){
+                case 0:{
+                    const enemy = this.enemies.create(x , y, 'enemy');
+                    enemy.setVelocity(this.enemySpeed, 0);
+                    enemy.setFlip(0, 1);
+                    break;
+                }
+                case 1: {
+                    const enemy = this.enemies.create(x , y, 'enemy2');
+                    enemy.setVelocity(this.enemySpeed, 0);
+                    enemy.setFlip(0, 1);
+                    break;
+                }
+            }
+        }
+        this.physics.add.collider(this.enemies, this.enemies);
+        
+        this.time.addEvent({
+            delay: 1000,
+            callback: this.onEnemyShooting,
+            callbackScope: this,
+            loop: true
+        });
+    }
+
+    onEnemyShooting() {
+        const enemies = this.enemies.getChildren();
+        for (let i = 0; i < enemies.length; i++) {
+            const enemy = enemies[i]; 
+            const bullet = this.enemyBullets.get();
+            if (bullet) {
+                bullet.setActive(true).setVisible(true);
+                bullet.setPosition(enemy.x, enemy.y);
+                bullet.body.velocity.y = this.enemySpeed; 
+            }
         }
     }
 
