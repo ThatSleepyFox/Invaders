@@ -3,8 +3,6 @@
 /*
 
     TODO:
-    -Több elleséges sprite készítése
-    -Hitboxok kezelése
     -HP kezelése
     -HP sprite létrehozása
     -Score rendszer implementálása
@@ -15,6 +13,7 @@
     -Hangok implementálása
 
 */
+
 
 class MenuScene extends Phaser.Scene{
 
@@ -63,6 +62,42 @@ class MenuScene extends Phaser.Scene{
     }
 }
 
+class PauseScene extends Phaser.Scene{
+    constructor(){
+        super({
+            key: 'PauseScene'
+        });
+    }
+
+    preload(){
+        this.load.image('pauseText', 'assets/pause/pauseText.png');
+    }
+
+    create(){
+        this.pauseText = this.add.sprite(180,320, "pauseText");
+        this.tweens.add({
+            targets: this.pauseText,
+            scale: {
+                from: 1,
+                to: 1.1 
+            },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1
+        });
+        this.escape = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    }
+
+    update(){
+        if(Phaser.Input.Keyboard.JustDown(this.escape)){
+            this.scene.stop();
+            this.scene.resume('GameScene');
+        }
+    }
+
+
+}
+
 class GameScene extends Phaser.Scene{
     constructor(){
         super({
@@ -73,6 +108,8 @@ class GameScene extends Phaser.Scene{
         this.playerSpeed = 200;
         this.playerBulletSpeed = 300;
         this.reloadTimer = 3000;
+
+        this.score = 0;
 
         this.enemySpeed = 100;
         this.enemyBulletSpeed = 300; 
@@ -119,7 +156,7 @@ class GameScene extends Phaser.Scene{
 
         //Ellenség lövedék
         this.enemyBullets = this.physics.add.group({
-            defaultKey: 'enemybullet',
+            defaultKey: 'enemybullet'
         });
 
         //Játékos lövedék
@@ -134,10 +171,14 @@ class GameScene extends Phaser.Scene{
         });
 
         this.spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.escape = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
         this.cursor = this.input.keyboard.createCursorKeys();
 
+        this.physics.add.overlap(this.player, this.enemyBullets, this.onRecieveDamage, null, this);
+        this.physics.add.overlap(this.enemies, this.bullets, this.onDealDamage, null, this);
 
     }
+
     update(){
         const ammoCounter = this.bullets.getTotalFree();
         if(ammoCounter == 0){
@@ -150,6 +191,13 @@ class GameScene extends Phaser.Scene{
             this.onShooting();
             this.onAmmoCount();
         }
+
+        if(Phaser.Input.Keyboard.JustDown(this.escape)){
+            this.scene.pause();
+            this.scene.launch('PauseScene');
+        }
+
+
         if(this.cursor.right.isDown){
             this.player.body.setVelocityX(this.playerSpeed);
 
@@ -168,9 +216,21 @@ class GameScene extends Phaser.Scene{
                 this.enemyBullets.killAndHide(eBullet);
             }
         }
-
         
 
+    }
+
+    onDealDamage(enemy, bullet){
+        bullet.setVisible(false);
+        this.enemies.killAndHide(enemy);
+        this.onAmmoCount();
+    }
+
+    onRecieveDamage(player, bullet){
+        this.enemyBullets.killAndHide(bullet);
+        bullet.body.enable = false
+
+        this.cameras.main.shake(200, 0.01);
     }
 
     onCreatePlayer(){
@@ -219,10 +279,13 @@ class GameScene extends Phaser.Scene{
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i]; 
             const bullet = this.enemyBullets.get();
-            if (bullet) {
-                bullet.setActive(true).setVisible(true);
-                bullet.setPosition(enemy.x, enemy.y);
-                bullet.body.velocity.y = this.enemySpeed; 
+            if(enemy && enemy.active){
+                if (bullet) {
+                    bullet.body.enable = true;
+                    bullet.setActive(true).setVisible(true);
+                    bullet.setPosition(enemy.x, enemy.y);
+                    bullet.body.velocity.y = this.enemySpeed; 
+                }
             }
         }
     }
@@ -253,6 +316,7 @@ class GameScene extends Phaser.Scene{
 
 const gameScene = new GameScene('game');
 const menuScene = new MenuScene('menu');
+const pauseScene = new PauseScene('pause');
 
 const game = new Phaser.Game({
     width: 360,
@@ -266,5 +330,5 @@ const game = new Phaser.Game({
             debug: false
         }
     },
-    scene: [menuScene, gameScene]
+    scene: [menuScene, gameScene, pauseScene]
 });
