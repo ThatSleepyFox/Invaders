@@ -1,19 +1,52 @@
 /// <reference path="./types/index.d.ts" />
 
-/*
+let playerScore = 0;
+class EndScene extends Phaser.Scene{
+    constructor(){
+        super({
+            key: 'EndScene'
+        });
+    }
 
-    TODO:
-    -HP kezelése
-    -HP sprite létrehozása
-    -Score rendszer implementálása
-    -Endscreen implementálása
-    -Pause menü implementálása
-    -Képesség létrehozása
-    -Képességhez tartozó sprite létrehozása
-    -Hangok implementálása
+    preload(){
+        this.load.image('endBackground', 'assets/menu/mainmenu.png');
+        this.load.image('gameOver', 'assets/end/gameover.png');
+        this.load.image('finalScore', 'assets/end/score.png');
+    }
 
-*/
+    create(){
+        this.endbackground = this.add.sprite(0,0, 'endBackground');
+        this.endbackground.setOrigin(0,0);
 
+        this.finalscore = this.add.sprite(180, 320, 'finalScore');
+
+        this.gameover = this.add.sprite(180,260, 'gameOver');
+        this.tweens.add({
+            targets: this.gameover,
+            scale: {
+                from: 1,
+                to: 1.1
+            },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+        });
+
+        this.scoreText = this.add.text(160, 360, playerScore, {
+            font:'20px Arial',
+            fill: '#ffffff',
+            align: 'center'
+        });
+
+    }
+    update(){
+        this.spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        if(Phaser.Input.Keyboard.JustDown(this.spacebar)){
+            this.scene.stop();
+            playerScore = 0;
+        }
+    }
+}
 
 class MenuScene extends Phaser.Scene{
 
@@ -24,11 +57,18 @@ class MenuScene extends Phaser.Scene{
     }
 
     preload(){
+        this.load.audio('backgroundMusic', 'assets/music/gameplayMusic.mp3');
         this.load.image('menuBackground', 'assets/menu/mainmenu.png');
         this.load.image('logo', 'assets/menu/logoText.png');
         this.load.image('press', 'assets/menu/pressText.png');
     }
     create(){
+        this.backgroundmusic = this.sound.add('backgroundMusic', {
+            volume: 0.5,
+            loop: true
+        });
+        this.backgroundmusic.play();
+
         this.menubackground = this.add.sprite(0,0, 'menuBackground');
         this.menubackground.setOrigin(0,0);
         this.logo = this.add.sprite(180, 180, 'logo');
@@ -94,27 +134,32 @@ class PauseScene extends Phaser.Scene{
             this.scene.resume('GameScene');
         }
     }
-
-
 }
+
+
 
 class GameScene extends Phaser.Scene{
     constructor(){
         super({
             key: 'GameScene'
         });
+        this.levelCounter = 0;
     }
     init() {
         this.playerSpeed = 200;
         this.playerBulletSpeed = 300;
         this.reloadTimer = 3000;
 
-        this.score = 0;
+        this.playerHealth = 3;
 
         this.enemySpeed = 100;
         this.enemyBulletSpeed = 300; 
+        this.isSpellReady = 1;
+        this.isSpellActive = 0;
     }
     preload(){
+
+
         this.load.image('background', 'assets/background.png');
         this.load.image('ship', 'assets/enemy01.png');
         this.load.image('enemy', 'assets/enemy02.png');
@@ -132,25 +177,43 @@ class GameScene extends Phaser.Scene{
             spacing: 0
         });
 
+        this.load.spritesheet('health', 'assets/health.png', {
+            frameWidth:32,
+            frameHeight: 32,
+            margin: 0,
+            spacing: 0
+        });
+
         this.load.image('bullet', 'assets/bullet.png');
         this.load.image('enemybullet', 'assets/enemybullet.png');
     }
     create(){
+
+        this.levelCounter++;
         //Háttér
         this.background = this.add.sprite(0,0, 'background');
         this.background.setOrigin(0,0);
 
+
         //Játékos
         this.onCreatePlayer();
 
-        //Pajzs
-        this.anims.create({
+
+        this.health1 = this.add.sprite(20,20, 'health', 0);
+        this.health2 = this.add.sprite(50,20, 'health', 0);
+        this.health3 = this.add.sprite(80,20, 'health', 0); 
+
+        //Pajzs  
+        this.anims.create({  
             key: 'shield',
             frames: this.anims.generateFrameNumbers('shield', {start: 0, end: 2}),
             frameRate: 8,
-            repeat: 0
+            repeat: -1
         });
         
+        this.shieldSprite = this.add.sprite(-100, -100, 'shield'); 
+        this.shieldSprite.play('shield');
+
         //Ellenség
         this.onCreateEnemy();
 
@@ -170,9 +233,16 @@ class GameScene extends Phaser.Scene{
             fill: '#ffffff'
         });
 
+        this.add.text(160, 20, `Level: ${this.levelCounter}`, {
+             font: '20px Arial',
+            fill: '#ffffff'
+        });
+
+
         this.spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.escape = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
         this.cursor = this.input.keyboard.createCursorKeys();
+        this.keyE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
         this.physics.add.overlap(this.player, this.enemyBullets, this.onRecieveDamage, null, this);
         this.physics.add.overlap(this.enemies, this.bullets, this.onDealDamage, null, this);
@@ -197,6 +267,12 @@ class GameScene extends Phaser.Scene{
             this.scene.launch('PauseScene');
         }
 
+        if(Phaser.Input.Keyboard.JustDown(this.keyE)){
+            if(this.isSpellReady == 1){
+                this.isSpellReady = 0;
+                this.isSpellActive = 1;
+            }
+        }
 
         if(this.cursor.right.isDown){
             this.player.body.setVelocityX(this.playerSpeed);
@@ -216,21 +292,61 @@ class GameScene extends Phaser.Scene{
                 this.enemyBullets.killAndHide(eBullet);
             }
         }
-        
+
+        if (this.enemies && this.enemies.countActive(true) <= 0) {
+            this.scene.restart();
+        }
+
+        if(this.isSpellActive == 1){
+            this.shieldSprite.setPosition(this.player.x, this.player.y);
+            this.time.delayedCall(3000, () => {
+                this.isSpellActive = 0;
+            });
+        } else {
+            this.shieldSprite.setPosition(-100,-100);
+            this.time.delayedCall(10000, () => {
+                this.isSpellReady = 1;
+            });
+        }
 
     }
 
+
     onDealDamage(enemy, bullet){
         bullet.setVisible(false);
+        bullet.setActive(false);
+        playerScore += 1000;
         this.enemies.killAndHide(enemy);
+        this.enemies.remove(enemy, true, true);
         this.onAmmoCount();
     }
 
     onRecieveDamage(player, bullet){
+        if(this.isSpellActive == 1){
+            return;
+        }
         this.enemyBullets.killAndHide(bullet);
         bullet.body.enable = false
 
+        const health = this.playerHealth;
+        this.playerHealth--;
+
         this.cameras.main.shake(200, 0.01);
+        switch(health){
+            case 1:{
+                this.scene.restart();
+                this.scene.launch('EndScene');
+                break;
+            }
+            case 2:{
+                this.health2.setFrame(1);
+                break;
+            }
+            case 3:{
+                this.health3.setFrame(1);
+                break;
+            }
+        }
     }
 
     onCreatePlayer(){
@@ -317,6 +433,7 @@ class GameScene extends Phaser.Scene{
 const gameScene = new GameScene('game');
 const menuScene = new MenuScene('menu');
 const pauseScene = new PauseScene('pause');
+const endScene = new EndScene('end');
 
 const game = new Phaser.Game({
     width: 360,
@@ -330,5 +447,8 @@ const game = new Phaser.Game({
             debug: false
         }
     },
-    scene: [menuScene, gameScene, pauseScene]
+    audio: {
+        disableWebAudio: false
+    },
+    scene: [menuScene, gameScene, pauseScene, endScene]
 });
